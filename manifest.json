@@ -1,0 +1,17 @@
+{
+  "name": "Fin0ra — Patrimonio & Fondi",
+  "short_name": "Fin0ra",
+  "description": "Gestisci conti, entrate, spese, fondi, beni e debiti in un'unica app locale.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3F0E8",
+  "theme_color": "#1F6F54",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
