@@ -667,6 +667,16 @@ function cloudLogout(){
   saveCloudConfig(cloudConfig);
 }
 
+function cloudHandleSessionError_(err){
+  if(String(err.message||'').includes('Sessione non valida')){
+    cloudConfig.token = '';
+    saveCloudConfig(cloudConfig);
+    showToast('Sessione cloud scaduta: rifai il login in Profilo > Sincronizzazione cloud.');
+    return true;
+  }
+  return false;
+}
+
 async function cloudPushNow(){
   if(!cloudIsLinked()) return;
   cloudSyncing = true; updateCloudStatusUI();
@@ -674,7 +684,7 @@ async function cloudPushNow(){
     await cloudRequest('save', {username:cloudConfig.username, token:cloudConfig.token, data: state});
     cloudLastSync = new Date();
   }catch(err){
-    showToast('Sincronizzazione non riuscita: dati salvati solo in locale.');
+    if(!cloudHandleSessionError_(err)) showToast('Sincronizzazione non riuscita: dati salvati solo in locale.');
   }
   cloudSyncing = false; updateCloudStatusUI();
 }
@@ -690,7 +700,30 @@ async function cloudPullNow(){
     renderAll();
     showToast('Dati aggiornati dal cloud.');
   }catch(err){
-    showToast('Impossibile caricare dal cloud: ' + err.message);
+    if(!cloudHandleSessionError_(err)) showToast('Impossibile caricare dal cloud: ' + err.message);
+  }
+  cloudSyncing = false; updateCloudStatusUI();
+}
+
+// Pull silenzioso: usato all'avvio e quando torni sulla scheda/app, per
+// recuperare le modifiche fatte nel frattempo da un altro dispositivo.
+// Non sovrascrive se c'è un push locale in sospeso (modifiche non ancora inviate).
+async function cloudAutoPullSilent(){
+  if(!cloudIsLinked()) return;
+  if(cloudSyncTimer) return;
+  cloudSyncing = true; updateCloudStatusUI();
+  try{
+    const res = await cloudRequest('load', {username:cloudConfig.username, token:cloudConfig.token});
+    const incoming = JSON.stringify(Object.assign(defaultState(), res.data));
+    const current = JSON.stringify(state);
+    if(incoming !== current){
+      state = JSON.parse(incoming);
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+      renderAll();
+    }
+    cloudLastSync = new Date();
+  }catch(err){
+    cloudHandleSessionError_(err); // fallisce in silenzio, non disturba con un toast per un tentativo automatico
   }
   cloudSyncing = false; updateCloudStatusUI();
 }
@@ -698,7 +731,7 @@ async function cloudPullNow(){
 function scheduleCloudPush(){
   if(!cloudIsLinked()) return;
   clearTimeout(cloudSyncTimer);
-  cloudSyncTimer = setTimeout(cloudPushNow, 3000);
+  cloudSyncTimer = setTimeout(()=>{ cloudSyncTimer = null; cloudPushNow(); }, 3000);
 }
 
 function updateCloudStatusUI(){
@@ -2659,6 +2692,15 @@ document.getElementById('themeToggleMobile').addEventListener('click', openTheme
 
 applyTheme();
 renderAll();
+
+// Sincronizzazione cloud: recupera i dati aggiornati all'avvio e ogni volta
+// che torni sulla scheda/app (es. sblocchi il telefono, cambi finestra sul PC),
+// così le modifiche fatte su un altro dispositivo arrivano senza dover
+// premere manualmente "Sincronizza".
+if(cloudIsLinked()) cloudAutoPullSilent();
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible') cloudAutoPullSilent();
+});
 
 // Registrazione del service worker per l'installazione come app (PWA).
 // Funziona solo se il file è servito via http/https (es. GitHub Pages),
